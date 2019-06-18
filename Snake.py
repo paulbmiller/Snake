@@ -106,7 +106,9 @@ class Snake(object):
     
     def get_state(self):
         state = []
-#        state.append(0)
+        directions = [0,0,0,0]
+        directions[self.direction] = 1
+        state.extend(directions)
     
     def next_pos(self, head_direction):
         """Define where the head of the snake is going to be in the next frame,
