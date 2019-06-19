@@ -9,6 +9,8 @@ import tkinter as tk
 from random import randint
 import time
 import numpy as np
+import NeuralNet
+import torch
 
 WINDOW_HEIGHT = 400
 WINDOW_WIDTH = 400
@@ -29,12 +31,12 @@ def random_direction():
 def spawn_fruit(snake, canvas):
     global FRUIT_X, FRUIT_Y, FRUIT
     
-    FRUIT_X = randint(0, W-1)
-    FRUIT_Y = randint(0, H-1)
-    
-    while (FRUIT_X, FRUIT_Y) in snake.body or (FRUIT_X, FRUIT_Y) == snake.head:
+    while True:
         FRUIT_X = randint(0, W-1)
         FRUIT_Y = randint(0, H-1)
+        if (FRUIT_X, FRUIT_Y) != snake.head \
+        and (FRUIT_X, FRUIT_Y) not in map(lambda l:l.get_coords(), snake.body):
+            break
     
     FRUIT = canvas.create_rectangle(to_grid(FRUIT_X), to_grid(FRUIT_Y),
                                     to_grid(FRUIT_X) + GRID_SIZE,
@@ -57,12 +59,19 @@ def main():
     
     spawn_fruit(s, can)
     
+    neural_net = NeuralNet.NN()
+    
     window.update()
     
     while not s.dead:
         s.step(randint(0,2))
+        
+        torch_state = torch.from_numpy(s.get_state()).float()
+        
         time.sleep(.1)
         window.update()
+        
+    print("The snake got a score of {}".format(s.score))
         
     window.mainloop()
     
@@ -106,9 +115,48 @@ class Snake(object):
     
     def get_state(self):
         state = []
+        
         directions = [0,0,0,0]
         directions[self.direction] = 1
+        
         state.extend(directions)
+        
+        fruit_right = 1 if FRUIT_X > self.head[0] else 0
+        fruit_below = 1 if FRUIT_Y > self.head[1] else 0
+        fruit_left = 1 if FRUIT_X < self.head[0] else 0
+        fruit_above = 1 if FRUIT_Y < self.head[1] else 0
+        
+        state.append(fruit_left)
+        state.append(fruit_below)
+        state.append(fruit_right)
+        state.append(fruit_above)
+        
+        right = [(self.head[0]+1, self.head[1]),(self.head[0]+2, self.head[1])]
+        below = [(self.head[0], self.head[1]+1),(self.head[0], self.head[1]+2)]
+        left = [(self.head[0]-1, self.head[1]),(self.head[0]-2, self.head[1])]
+        above = [(self.head[0], self.head[1]-1),(self.head[0], self.head[1]-2)]
+        
+        cells = [right, below, left, above]
+        popped = (self.direction + 2) % 4
+        cells.pop(popped)
+        
+        if popped == 1:
+            cells[0], cells[1], cells[2] = cells[1], cells[2], cells[0]
+        elif popped == 2:
+            cells[0], cells[1], cells[2] = cells[2], cells[0], cells[1]
+            
+        for direction in cells:
+            if self.check_danger(direction[0][0], direction[0][1]):
+                state.append(1)
+                state.append(1)
+            elif self.check_danger(direction[1][0] , direction[1][1]):
+                state.append(0)
+                state.append(1)
+            else:
+                state.append(0)
+                state.append(0)
+        
+        return np.asarray(state)
     
     def next_pos(self, head_direction):
         """Define where the head of the snake is going to be in the next frame,
@@ -129,6 +177,13 @@ class Snake(object):
         if self.direction == 3:
             return (self.head[0], self.head[1]-1)
         
+    def check_danger(self, x, y):
+        if x <= 0 or y <= 0 or x >= W or y >= H:
+            return True
+        for body_part in self.body:
+            if body_part.get_coords() == (x, y):
+                return True
+        
     def step(self, head_direction):
         """Move the snake one cell in head_direction (0 for the snake to turn
         left, 1 for the snake to go straight and 2 for going right).
@@ -139,13 +194,7 @@ class Snake(object):
         
         new_head = self.next_pos(head_direction)
         
-        for body_part in self.body:
-            if body_part.get_coords() == new_head:
-                self.died()
-                return
-            
-        if new_head[0] <= 0 or new_head[0] >= W \
-        or new_head[1] <= 0 or new_head[1] >= H:
+        if self.check_danger(new_head[0], new_head[1]):
             self.died()
             return
         
@@ -225,8 +274,6 @@ class Snake(object):
         
         for body_part in self.body:
             body_part.died()
-            
-        print("The snake got a score of {}".format(self.score))
         
 
 class Body(object):

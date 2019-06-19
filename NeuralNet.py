@@ -10,7 +10,7 @@ import numpy as np
 
 
 class NN(object):
-    def __init__(self, D_in=11, H1=100, H2=100, D_out=3):
+    def __init__(self, D_in=14, H1=100, H2=100, D_out=3):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         if torch.cuda.is_available():
@@ -21,21 +21,23 @@ class NN(object):
             print("Running on CPU")
         
         self.model = torch.nn.Sequential(torch.nn.Linear(D_in, H1),
-                                    torch.nn.ReLU(),
-                                    torch.nn.Linear(H1, H2),
-                                    torch.nn.ReLU(),
-                                    torch.nn.Linear(H2, D_out))
+                                         torch.nn.ReLU(),
+                                         torch.nn.Linear(H1, H2),
+                                         torch.nn.ReLU(),
+                                         torch.nn.Linear(H2, D_out))
         
         self.loss_fn = torch.nn.MSELoss(reduction="sum")
         self.lr = 1e-4
-        
-    def forward(self, x, y):
+    
+    def forward(self, x, y=None):
         y_pred = self.model(x)
         
-        loss = self.loss_fn(y_pred, y)
+        return y_pred
         
-        self.model.zero_grad()
-        loss.backward()
+        if y != None:
+            loss = self.loss_fn(y_pred, y)
+            self.model.zero_grad()
+            loss.backward()
         
         with torch.no_grad():
             for param in self.model.parameters():
