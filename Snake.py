@@ -6,14 +6,14 @@ Created on Fri Jun 14 12:02:16 2019
 """
 
 import tkinter as tk
-from random import randint
-import time
 import numpy as np
-import NeuralNet
-import torch
+import time
+from math import sqrt
+from random import randint
+from DeepQLearning import DeepQNAgent
 
-WINDOW_HEIGHT = 400
-WINDOW_WIDTH = 400
+WINDOW_HEIGHT = 200
+WINDOW_WIDTH = 200
 GRID_SIZE = 10
 H = WINDOW_HEIGHT // GRID_SIZE
 W = WINDOW_WIDTH // GRID_SIZE
@@ -38,42 +38,101 @@ def spawn_fruit(snake, canvas):
         and (FRUIT_X, FRUIT_Y) not in map(lambda l:l.get_coords(), snake.body):
             break
     
-    FRUIT = canvas.create_rectangle(to_grid(FRUIT_X), to_grid(FRUIT_Y),
-                                    to_grid(FRUIT_X) + GRID_SIZE,
-                                    to_grid(FRUIT_Y) + GRID_SIZE, fill = "red")
+    if canvas is not None:
+        FRUIT = canvas.create_rectangle(to_grid(FRUIT_X), to_grid(FRUIT_Y),
+                                        to_grid(FRUIT_X) + GRID_SIZE,
+                                        to_grid(FRUIT_Y) + GRID_SIZE,
+                                        fill = "red")
 
-
-def main():
-    window = tk.Tk()
-    
-    window.winfo_toplevel().title("Snake")
-    
-    can = tk.Canvas(window, width = WINDOW_WIDTH, 
-                    height = WINDOW_HEIGHT, highlightthickness=0)
-    
-    can.config(bg = "black")
-    
-    can.pack()
+def start_snake(display=False):
+    if display:
+        window = tk.Tk()
+        
+        window.winfo_toplevel().title("Snake")
+        
+        can = tk.Canvas(window, width = WINDOW_WIDTH, 
+                        height = WINDOW_HEIGHT, highlightthickness=0)
+        
+        can.config(bg = "black")
+        
+        can.pack()
+        
+    else:
+        window, can = None, None
     
     s = Snake(can)
     
     spawn_fruit(s, can)
     
-    neural_net = NeuralNet.NN()
+    return window, s, can
+
+def run():
+    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=50000,
+                        replace=None)
     
-    window.update()
+    window = None
     
-    while not s.dead:
-        s.step(randint(0,2))
+    print("Initializing memory")
+    
+    while agent.mem_cntr < agent.mem_size:
+        window, s, can = start_snake(display=False)
+        state_old = s.get_state()
+        while not s.dead and agent.mem_cntr < agent.mem_size:
+            action = randint(0,2)
+            s.step(action)
+            state_new = s.get_state()
+            reward = agent.set_reward(s)
+            agent.store_transition(state_old, action, reward, state_new)
+            state_old = state_new
         
-        torch_state = torch.from_numpy(s.get_state()).float()
+    print("Done initializing memory of size {}".format(agent.mem_cntr))
+    
+    scores = []
+    eps_history = []
+    num_games = 200
+    batch_size = 32
+    window = None
+    
+    for i in range(num_games):
+        print("starting game {}, epsilon : {}".format(i+1, agent.EPSILON))
+        eps_history.append(agent.EPSILON)
         
-        time.sleep(.1)
-        window.update()
+        if window is not None:
+            window.destroy()
+            
+        window, s, can = start_snake(display=False)
         
-    print("The snake got a score of {}".format(s.score))
+        if window is not None:
+            window.update()
+            
+        state_old = s.get_state()        
+        while not s.dead:
+            
+            if window is not None:
+                time.sleep(0.05)
+                
+            action = agent.choose_action(state_old)
+            s.step(action)
+                
+            state_new = s.get_state()
+            reward = agent.set_reward(s)
+            agent.store_transition(state_old, action, reward, state_new)
+            
+            if window is not None:
+                window.update()
+                
+            state_old = state_new
+            agent.learn(batch_size)
+        scores.append(s.score)
         
-    window.mainloop()
+        if window is not None:
+            time.sleep(0.1)
+            
+        print("score : {}".format(s.score))
+       
+    if window is not None:
+        window.destroy()
+
     
 class Snake(object):
     def __init__(self, canvas):
@@ -82,6 +141,7 @@ class Snake(object):
         self.size = 3   # Size of the body (does not include the head)
         self.canvas = canvas
         self.score = 0
+        self.moved_closer = False
         
         # x and y position of the head
         self.head = (W//2, H//2)
@@ -89,7 +149,7 @@ class Snake(object):
         """Choose a random direction in which to start (0 for right, 1 for 
         down, 2 for left and 3 for up and initialize the snake going straight.
         """
-        self.direction = randint(0,3)
+        self.direction = randint(0, 3)
         
         # x and y positions of the body (does not include the head)
         self.body = []
@@ -126,17 +186,45 @@ class Snake(object):
         fruit_left = 1 if FRUIT_X < self.head[0] else 0
         fruit_above = 1 if FRUIT_Y < self.head[1] else 0
         
-        state.append(fruit_left)
-        state.append(fruit_below)
         state.append(fruit_right)
+        state.append(fruit_below)
+        state.append(fruit_left)
         state.append(fruit_above)
         
+        right = (self.head[0]+1, self.head[1])
+        below = (self.head[0]+1, self.head[1])
+        left = (self.head[0]+1, self.head[1])
+        above = (self.head[0]+1, self.head[1])
+        
+        cells = [left, above, right, below]
+        
+        for i in range(4):
+            if self.direction == i:
+                pass
+            elif self.check_danger(cells[i][0], cells[i][1]):
+                state.append(1)
+            else:
+                state.append(0)
+        
+        """
         right = [(self.head[0]+1, self.head[1]),(self.head[0]+2, self.head[1])]
         below = [(self.head[0], self.head[1]+1),(self.head[0], self.head[1]+2)]
         left = [(self.head[0]-1, self.head[1]),(self.head[0]-2, self.head[1])]
         above = [(self.head[0], self.head[1]-1),(self.head[0], self.head[1]-2)]
         
-        cells = [right, below, left, above]
+        cells = [left, above, right, below]
+        
+        for i in range(4):
+            if self.direction == i:
+                state.extend([1,1])
+            elif self.check_danger(cells[i][0][0], cells[i][0][1]):
+                state.extend([1,1])
+            elif self.check_danger(cells[i][1][0], cells[i][1][1]):
+                state.extend([0,1])
+            else:
+                state.extend([0,0])
+        
+
         popped = (self.direction + 2) % 4
         cells.pop(popped)
         
@@ -147,14 +235,12 @@ class Snake(object):
             
         for direction in cells:
             if self.check_danger(direction[0][0], direction[0][1]):
-                state.append(1)
-                state.append(1)
+                state.extend([1,1])
             elif self.check_danger(direction[1][0] , direction[1][1]):
-                state.append(0)
-                state.append(1)
+                state.extend([0,1])
             else:
-                state.append(0)
-                state.append(0)
+                state.extend([0,0])
+        """
         
         return np.asarray(state)
     
@@ -180,9 +266,12 @@ class Snake(object):
     def check_danger(self, x, y):
         if x <= 0 or y <= 0 or x >= W or y >= H:
             return True
-        for body_part in self.body:
+        for body_part in self.body[0:-1]:
             if body_part.get_coords() == (x, y):
                 return True
+        # in case the snake just ate (the tail will stay in place)
+        if self.body[-1].get_coords() == (x, y) and self.just_ate == True:
+            return True
         
     def step(self, head_direction):
         """Move the snake one cell in head_direction (0 for the snake to turn
@@ -216,14 +305,28 @@ class Snake(object):
             # In case the new fruit just spawned where we are moving
             if FRUIT_X == self.head[0] and FRUIT_Y == self.head[1]:
                 self.just_ate = True
-                self.canvas.delete(FRUIT)
+                
+                if self.canvas is not None:
+                    self.canvas.delete(FRUIT)
+                    
                 spawn_fruit(self, self.canvas)
                 
             else:
                 self.just_ate = False
             
         else:
+            """
+            dist_from_fruit_0 = self.get_dist_from_fruit()
             # Make the head become part of the body
+            self.head = new_head
+            dist_from_fruit_1 = self.get_dist_from_fruit()
+            
+            if dist_from_fruit_1 < dist_from_fruit_0:
+                self.moved_closer = True
+            else:
+                self.moved_closer = False
+            """
+            
             self.head = new_head
             
             new_body = self.body[:-1]
@@ -241,7 +344,10 @@ class Snake(object):
             if FRUIT_X == self.head[0] and FRUIT_Y == self.head[1]:
                 self.just_ate = True
                 self.score += 1
-                self.canvas.delete(FRUIT)
+                
+                if self.canvas is not None:
+                    self.canvas.delete(FRUIT)
+                    
                 spawn_fruit(self, self.canvas)
     
     def get_pos(self, x, y):
@@ -269,6 +375,12 @@ class Snake(object):
             if new_dir == 0 or new_dir == 2:
                 self.direction = new_dir
     
+    def get_dist_from_fruit(self):
+        dist = (FRUIT_X - self.head[0])**2
+        dist = dist + (FRUIT_Y -self.head[1])**2
+        dist = sqrt(dist)
+        return dist
+    
     def died(self):
         self.dead = True
         
@@ -285,10 +397,11 @@ class Body(object):
         self.draw()
         
     def change_color(self):
-        if self.is_head():
-            self.canvas.itemconfigure(self.obj, fill="blue")
-        else:
-            self.canvas.itemconfigure(self.obj, fill="dodger blue")
+        if self.canvas is not None:
+            if self.is_head():
+                self.canvas.itemconfigure(self.obj, fill="blue")
+            else:
+                self.canvas.itemconfigure(self.obj, fill="dodger blue")
 
     def draw(self):
         if self.is_head():
@@ -299,33 +412,38 @@ class Body(object):
         grid_x = to_grid(self.x)
         grid_y = to_grid(self.y)
         
-        self.obj = self.canvas.create_rectangle(grid_x, grid_y, 
-                                                grid_x + GRID_SIZE,
-                                                grid_y + GRID_SIZE, 
-                                                fill=fill_color)
+        if self.canvas is not None:
+            self.obj = self.canvas.create_rectangle(grid_x, grid_y, 
+                                                    grid_x + GRID_SIZE,
+                                                    grid_y + GRID_SIZE, 
+                                                    fill=fill_color)
             
     def is_head(self):
         return self.Id == 0
     
     def make_head(self):
         self.Id = 0
-        self.canvas.itemconfigure(self.obj, fill="dodger blue")
+        if self.canvas is not None:
+            self.canvas.itemconfigure(self.obj, fill="dodger blue")
     
     def change_coords(self, x, y):
         self.x = x
         self.y = y
         grid_x = to_grid(self.x)
         grid_y = to_grid(self.y)
-        self.canvas.coords(self.obj, grid_x, grid_y, grid_x + GRID_SIZE,
-                           grid_y + GRID_SIZE)
+        
+        if self.canvas is not None:
+            self.canvas.coords(self.obj, grid_x, grid_y, grid_x + GRID_SIZE,
+                               grid_y + GRID_SIZE)
         
     def get_coords(self):
         return (self.x, self.y)
     
     def died(self):
-        self.canvas.itemconfigure(self.obj, fill="white")
+        if self.canvas is not None:
+            self.canvas.itemconfigure(self.obj, fill="white")
         
 
 if __name__ == "__main__":
-    main()
+    run()
     
