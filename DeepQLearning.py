@@ -7,6 +7,7 @@ Created on Thu Jun 20 13:16:11 2019
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 class DeepQNetwork(torch.nn.Module):
     def __init__(self, alpha):
@@ -18,7 +19,7 @@ class DeepQNetwork(torch.nn.Module):
         
         self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
         self.loss = torch.nn.MSELoss(reduction="sum")
-        self.lr = 1e-4
+        self.lr = 4e-4
         
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -33,9 +34,9 @@ class DeepQNetwork(torch.nn.Module):
         obs = torch.Tensor(x).to(self.device)
         
         #obs = obs.view()
-        obs = torch.nn.functional.relu(self.lin1(obs))
-        obs = torch.nn.functional.relu(self.lin2(obs))
-        obs = torch.nn.functional.relu(self.lin3(obs))
+        obs = F.relu(self.lin1(F.dropout(obs)))
+        obs = F.relu(self.lin2(F.dropout(obs)))
+        obs = F.relu(self.lin3(obs))
         actions = self.lin4(obs)
         
         return actions
@@ -99,15 +100,25 @@ class DeepQNAgent(object):
         rewards = torch.Tensor(list(memory[:, 2])).to(self.Q_eval.device)
         
         Qtarget = Qpred
-        Qtarget[:,maxA] = rewards + self.GAMMA*torch.max(Qnext[1])
+        #Qtarget[:,maxA] = rewards + self.GAMMA*Qnext[:,maxA]
+        
+        print(Qtarget)
+        
+        for i in range(len(maxA)):
+            Qtarget[i, maxA[i]] = rewards[i] + self.GAMMA*Qnext[i,maxA[i]]
+            
+        print(Qtarget)
         
         if self.steps > 500:
-            if self.EPSILON - 1e-4 > self.EPS_END:
-                self.EPSILON -= 1e-4
+            if self.EPSILON - self.Q_eval.lr > self.EPS_END:
+                self.EPSILON -= self.Q_eval.lr
             else:
                 self.EPSILON = self.EPS_END
         
         loss = self.Q_eval.loss(Qtarget, Qpred).to(self.Q_eval.device)
+        
+        print(loss)
+
         loss.backward()
         self.Q_eval.optimizer.step()
         self.learn_step_counter += 1

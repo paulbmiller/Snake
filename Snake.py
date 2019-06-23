@@ -67,7 +67,7 @@ def start_snake(display=False):
     return window, s, can
 
 def run():
-    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=50000,
+    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=5000,
                         replace=None)
     
     window = None
@@ -138,7 +138,7 @@ class Snake(object):
     def __init__(self, canvas):
         self.dead = False
         self.just_ate = False        
-        self.size = 3   # Size of the body (does not include the head)
+        self.size = 1   # Size of the body (does not include the head)
         self.canvas = canvas
         self.score = 0
         self.moved_closer = False
