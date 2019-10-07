@@ -113,8 +113,7 @@ def run():
             action = agent.choose_action(state_old)
             s.step(action)
                 
-            state_new = s.get_state()
-            reward = agent.set_reward(s)
+            state_new, reward = s.state_reward()
             agent.store_transition(state_old, action, reward, state_new)
             
             if window is not None:
