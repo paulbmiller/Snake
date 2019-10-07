@@ -9,6 +9,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+# Since input sizes don't vary
+torch.backends.cudnn.benchmark=True
+
 class DeepQNetwork(torch.nn.Module):
     def __init__(self, alpha):
         super(DeepQNetwork, self).__init__()
