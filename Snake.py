@@ -80,8 +80,7 @@ def run():
         while not s.dead and agent.mem_cntr < agent.mem_size:
             action = randint(0,2)
             s.step(action)
-            state_new = s.get_state()
-            reward = agent.set_reward(s)
+            state_new, reward = s.state_reward()
             agent.store_transition(state_old, action, reward, state_new)
             state_old = state_new
         
@@ -142,6 +141,7 @@ class Snake(object):
         self.canvas = canvas
         self.score = 0
         self.moved_closer = False
+        self.reward = 0
         
         # x and y position of the head
         self.head = (W//2, H//2)
@@ -244,6 +244,9 @@ class Snake(object):
         
         return np.asarray(state)
     
+    def state_reward(self):
+        return self.get_state(), self.reward
+    
     def next_pos(self, head_direction):
         """Define where the head of the snake is going to be in the next frame,
         given the direction where the head is going and the general direction
@@ -310,9 +313,11 @@ class Snake(object):
                     self.canvas.delete(FRUIT)
                     
                 spawn_fruit(self, self.canvas)
+                self.reward = 10
                 
             else:
                 self.just_ate = False
+                self.reward = 0
             
         else:
             """
@@ -349,6 +354,10 @@ class Snake(object):
                     self.canvas.delete(FRUIT)
                     
                 spawn_fruit(self, self.canvas)
+                self.reward = 10
+            
+            else:
+                self.reward = 0
     
     def get_pos(self, x, y):
         """Method to check if there is something at a specific position x,y.
@@ -383,6 +392,7 @@ class Snake(object):
     
     def died(self):
         self.dead = True
+        self.reward = -10
         
         for body_part in self.body:
             body_part.died()
