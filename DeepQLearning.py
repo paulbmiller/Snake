@@ -122,14 +122,7 @@ class DeepQNAgent(object):
         loss.backward()
         self.Q_eval.optimizer.step()
         self.learn_step_counter += 1
-        
-    def set_reward(self, snake):
-        if snake.dead:
-            return -10
-        if snake.just_ate:
-            return 10
-        else:
-            return 0
+
 
         
         
