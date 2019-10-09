@@ -66,14 +66,15 @@ def start_snake(display=False):
     
     return window, s, can
 
+
 def run():
     agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=5000,
                         replace=None)
-    
+
     window = None
-    
+
     print("Initializing memory")
-    
+
     while agent.mem_cntr < agent.mem_size:
         window, s, can = start_snake(display=False)
         state_old = s.get_state()
@@ -83,55 +84,55 @@ def run():
             state_new, reward = s.state_reward()
             agent.store_transition(state_old, action, reward, state_new)
             state_old = state_new
-        
+
     print("Done initializing memory of size {}".format(agent.mem_cntr))
-    
+
     scores = []
     eps_history = []
     num_games = 200
     batch_size = 32
     window = None
-    
+
     for i in range(num_games):
         print("starting game {}, epsilon : {}".format(i+1, agent.EPSILON))
         eps_history.append(agent.EPSILON)
-        
+
         if window is not None:
             window.destroy()
-            
+
         window, s, can = start_snake(display=False)
-        
+
         if window is not None:
             window.update()
-            
+
         state_old = s.get_state()        
         while not s.dead:
-            
+
             if window is not None:
                 time.sleep(0.05)
-                
+
             action = agent.choose_action(state_old)
             s.step(action)
-                
+
             state_new, reward = s.state_reward()
             agent.store_transition(state_old, action, reward, state_new)
-            
+
             if window is not None:
                 window.update()
-                
+
             state_old = state_new
             agent.learn(batch_size)
         scores.append(s.score)
-        
+
         if window is not None:
             time.sleep(0.1)
-            
+
         print("score : {}".format(s.score))
-       
+
     if window is not None:
         window.destroy()
 
-    
+
 class Snake(object):
     def __init__(self, canvas):
         self.dead = False
@@ -141,18 +142,18 @@ class Snake(object):
         self.score = 0
         self.moved_closer = False
         self.reward = 0
-        
+
         # x and y position of the head
         self.head = (W//2, H//2)
-        
+
         """Choose a random direction in which to start (0 for right, 1 for 
         down, 2 for left and 3 for up and initialize the snake going straight.
         """
         self.direction = randint(0, 3)
-        
+
         # x and y positions of the body (does not include the head)
         self.body = []
-        
+
         self.body.append(Body(self.head[0], self.head[1], 0, self.canvas))
         
         if self.direction == 0:
@@ -391,7 +392,7 @@ class Snake(object):
     
     def died(self):
         self.dead = True
-        self.reward = -10
+        self.reward = -50
         
         for body_part in self.body:
             body_part.died()
