@@ -59,11 +59,11 @@ def start_snake(display=False):
         
     else:
         window, can = None, None
-    
+
     s = Snake(can)
-    
+
     spawn_fruit(s, can)
-    
+
     return window, s, can
 
 
@@ -78,22 +78,28 @@ def run():
     while agent.mem_cntr < agent.mem_size:
         window, s, can = start_snake(display=False)
         state_old = s.get_state()
-        while not s.dead and agent.mem_cntr < agent.mem_size:
-            action = randint(0,2)
+        game_ended = False
+        while not game_ended and agent.mem_cntr < agent.mem_size:
+            action = randint(0, 2)
             s.step(action)
-            state_new, reward = s.state_reward()
-            agent.store_transition(state_old, action, reward, state_new)
+            state_new = s.get_state()
+            agent.store_transition(state_old, action, s.reward, state_new)
             state_old = state_new
+            if s.dead:
+                game_ended = True
 
     print("Done initializing memory of size {}".format(agent.mem_cntr))
 
     scores = []
     eps_history = []
-    num_games = 200
+    num_games = 500
     batch_size = 32
     window = None
 
     for i in range(num_games):
+        game_ended = False
+        steps = 0
+
         print("starting game {}, epsilon : {}".format(i+1, agent.EPSILON))
         eps_history.append(agent.EPSILON)
 
@@ -105,29 +111,33 @@ def run():
         if window is not None:
             window.update()
 
-        state_old = s.get_state()        
-        while not s.dead:
-
+        state_old = s.get_state()
+        while not game_ended:
+            steps += 1
             if window is not None:
                 time.sleep(0.05)
 
             action = agent.choose_action(state_old)
             s.step(action)
 
-            state_new, reward = s.state_reward()
-            agent.store_transition(state_old, action, reward, state_new)
+            state_new = s.get_state()
+            agent.store_transition(state_old, action, s.reward, state_new)
 
             if window is not None:
                 window.update()
 
             state_old = state_new
             agent.learn(batch_size)
+
+            if s.dead:
+                game_ended = True
+
         scores.append(s.score)
 
         if window is not None:
             time.sleep(0.1)
 
-        print("score : {}".format(s.score))
+        print("score : {}, steps: {}".format(s.score, steps))
 
     if window is not None:
         window.destroy()

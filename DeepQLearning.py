@@ -23,6 +23,7 @@ class DeepQNetwork(torch.nn.Module):
 
         self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
         self.loss = torch.nn.MSELoss()
+        self.lr = 1e-4
 
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
