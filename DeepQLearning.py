@@ -1,10 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Jun 20 13:16:11 2019
-
-@author: mille
-"""
-
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -23,7 +17,7 @@ class DeepQNetwork(torch.nn.Module):
 
         self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
         self.loss = torch.nn.MSELoss()
-        self.lr = 1e-4
+        self.lr = 3e-4
 
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -36,8 +30,8 @@ class DeepQNetwork(torch.nn.Module):
 
     def forward(self, x):
         obs = torch.Tensor(x).to(self.device)
-        obs = F.relu(self.lin1(F.dropout(obs)))
-        obs = F.relu(self.lin2(F.dropout(obs)))
+        obs = F.relu(self.lin1(obs))
+        obs = F.relu(self.lin2(obs))
         obs = F.relu(self.lin3(obs))
         actions = self.lin4(obs)
         return actions
@@ -77,10 +71,10 @@ class DeepQNAgent(object):
         self.steps += 1
         return action
 
-    def learn(self, batch_size):
+    def learn(self, batch_size, debug=False):
         self.Q_eval.optimizer.zero_grad()
-        if self.replace_target_cnt is not None and \
-        self.learn_step_counter % self.replace_target_cnt == 0:
+        if (self.replace_target_cnt is not None and
+                (self.learn_step_counter % self.replace_target_cnt) == 0):
             self.Q_next.load_state_dict(self.Q_eval.state_dict())
 
         if self.mem_cntr + batch_size < self.mem_size:
@@ -88,10 +82,10 @@ class DeepQNAgent(object):
         else:
             mem_start = int(np.random.choice(
                     range(self.mem_size-batch_size-1)))
-        
+
         mini_batch = self.memory[mem_start:mem_start+batch_size]
         memory = np.array(mini_batch)
-        
+
         Qpred = self.Q_eval.forward(list(memory[:, 0][:])).to(
                 self.Q_eval.device)
         Qnext = self.Q_next.forward(list(memory[:, 3][:])).to(
@@ -99,10 +93,10 @@ class DeepQNAgent(object):
 
         maxA = torch.argmax(Qnext, dim=1).to(self.Q_eval.device)
         rewards = torch.Tensor(list(memory[:, 2])).to(self.Q_eval.device)
-        
+
         Qtarget = Qpred.clone()
-        #Qtarget[:,maxA] = rewards + self.GAMMA*Qnext[:,maxA]
-        
+        # Qtarget[:, maxA] = rewards + self.GAMMA*Qnext[:, maxA]
+
         for i in range(len(maxA)):
             if rewards[i] != 0:
                 Qtarget[i, maxA[i]] = rewards[i] + self.GAMMA*Qnext[i, maxA[i]]
@@ -112,10 +106,13 @@ class DeepQNAgent(object):
                 self.EPSILON -= self.Q_eval.lr
             else:
                 self.EPSILON = self.EPS_END
-        
+
         loss = self.Q_eval.loss(Qtarget, Qpred).to(self.Q_eval.device)
 
         loss.backward()
+        
+        if debug:
+            print(loss)
+
         self.Q_eval.optimizer.step()
         self.learn_step_counter += 1
-
