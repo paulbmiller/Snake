@@ -2,7 +2,6 @@
 import tkinter as tk
 import numpy as np
 import time
-from math import sqrt
 from random import randint
 from DeepQLearning import DeepQNAgent
 
@@ -80,7 +79,7 @@ def run_user():
 
 
 def run(display=False, debug=False, debug_every=10):
-    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=5000,
+    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=50000,
                         replace=None)
 
     window = None
@@ -120,10 +119,10 @@ def run(display=False, debug=False, debug_every=10):
             else:
                 str_out += ", epsilon : {:.3f}".format(agent.EPSILON)
                 print(str_out)
-                
+
             eps_history.append(agent.EPSILON)
 
-            if agent.EPSILON == 0 and i % debug_every == 0:
+            if agent.EPSILON == 0 and i % debug_every == 0 and display:
                 win_title = 'Snake {}'.format(i)
                 window, s, can = start_snake(display=True,
                                              display_title=win_title)
@@ -318,27 +317,27 @@ class Snake(object):
     def key(self, event):
         if event.keycode == 37:
             if self.direction == 0:
-                pass
+                return
             else:
                 self.direction = 2
                 self.step(1)
         elif event.keycode == 38:
             if self.direction == 1:
-                pass
+                return
             else:
                 self.direction = 3
                 self.step(1)
 
         elif event.keycode == 39:
             if self.direction == 2:
-                pass
+                return
             else:
                 self.direction = 0
                 self.step(1)
 
         elif event.keycode == 40:
             if self.direction == 3:
-                pass
+                return
             else:
                 self.direction = 1
                 self.step(1)
@@ -388,7 +387,7 @@ class Snake(object):
                     self.canvas.delete(FRUIT)
 
                 spawn_fruit(self, self.canvas)
-                self.reward = 100
+                self.reward = 10
 
             else:
                 self.just_ate = False
@@ -418,7 +417,7 @@ class Snake(object):
                     self.canvas.delete(FRUIT)
 
                 spawn_fruit(self, self.canvas)
-                self.reward = 100
+                self.reward = 10
 
             elif moved_closer:
                 self.reward = 0.1
@@ -460,7 +459,7 @@ class Snake(object):
 
     def died(self):
         self.dead = True
-        self.reward = -50
+        self.reward = -10
 
         for body_part in self.body:
             body_part.died()
@@ -523,4 +522,5 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=True, debug=False, debug_every=1)
+    run(display=False, debug=False, debug_every=1)
+    # run_user()
