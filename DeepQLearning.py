@@ -10,7 +10,7 @@ torch.backends.cudnn.benchmark = True
 class DeepQNetwork(torch.nn.Module):
     def __init__(self, alpha):
         super(DeepQNetwork, self).__init__()
-        self.lin1 = torch.nn.Linear(11, 128)
+        self.lin1 = torch.nn.Linear(12, 128)
         self.lin2 = torch.nn.Linear(128, 128)
         self.lin3 = torch.nn.Linear(128, 4)
 

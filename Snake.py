@@ -303,9 +303,7 @@ class Snake(object):
         cells = [left, above, right, below]
 
         for i in range(4):
-            if self.direction == i:
-                pass
-            elif self.check_danger(cells[i][0], cells[i][1]):
+            if self.check_danger(cells[i][0], cells[i][1]):
                 state.append(1)
             else:
                 state.append(0)
