@@ -101,15 +101,16 @@ def run(display=False, debug=False, debug_every=10):
 
     print("Done initializing memory of size {}".format(agent.mem_cntr))
 
-    scores = []
+    scores = np.array([])
     eps_history = []
-    num_games = 10000
+    num_games = 100
     batch_size = 32
     window = None
     debug_cntr = 0
+    i = 1
 
     try:
-        for i in range(1, num_games+1):
+        while agent.EPSILON > 0:
             game_ended = False
             steps = 0
 
@@ -159,17 +160,80 @@ def run(display=False, debug=False, debug_every=10):
                 if s.dead:
                     game_ended = True
 
-            scores.append(s.score)
-
             if window is not None:
                 time.sleep(0.1)
                 window.destroy()
 
             print("Score : {}, steps: {}".format(s.score, steps))
+            i += 1
+
+        for j in range(1, num_games+1):
+            game_ended = False
+            steps = 0
+
+            str_out = "Starting game {}".format(j)
+            if agent.EPSILON == 0:
+                print(str_out)
+            else:
+                str_out += ", epsilon : {:.3f}".format(agent.EPSILON)
+                print(str_out)
+
+            eps_history.append(agent.EPSILON)
+
+            if agent.EPSILON == 0 and i % debug_every == 0 and display:
+                win_title = 'Snake {}'.format(j)
+                window, s, can = start_snake(display=True,
+                                             display_title=win_title)
+                window.update()
+
+            else:
+                window, s, can = start_snake(display=False)
+
+            state_old = s.get_state()
+            while not game_ended:
+                if window is not None:
+                    time.sleep(0.05)
+
+                action = agent.choose_action(state_old)
+                s.step(action)
+
+                state_new = s.get_state()
+                agent.store_transition(state_old, action, s.reward, state_new)
+
+                steps += 1
+                if window is not None:
+                    window.update()
+
+                state_old = state_new
+
+                if debug_cntr >= debug_every and debug:
+                    agent.learn(batch_size, debug=True)
+                    debug_cntr = 0
+                else:
+                    agent.learn(batch_size, debug=False)
+                    if debug:
+                        debug_cntr += 1
+
+                if s.dead:
+                    game_ended = True
+
+            scores = np.append(scores, s.score)
+
+            if window is not None:
+                time.sleep(0.1)
+                window.destroy()
+
+            print("Score : {}, steps: {}, rewards: {}".format(s.score, steps,
+                                                              [s.EAT_REWARD,
+                                                               s.DEATH_PUNISH,
+                                                               s.CLOSER_REWARD
+                                                               ]))
 
     except KeyboardInterrupt:
         if window is not None:
             window.destroy()
+
+    print("Sum of scores after {} : {}".format(num_games, scores.sum()))
 
 
 class Snake(object):
@@ -180,6 +244,9 @@ class Snake(object):
         self.canvas = canvas
         self.score = 0
         self.reward = 0
+        self.CLOSER_REWARD = 0.1
+        self.EAT_REWARD = 1
+        self.DEATH_PUNISH = -1
 
         # x and y position of the head
         self.head = (W//2, H//2)
@@ -321,12 +388,14 @@ class Snake(object):
             else:
                 self.direction = 2
                 self.step(1)
+                print(self.reward)
         elif event.keycode == 38:
             if self.direction == 1:
                 return
             else:
                 self.direction = 3
                 self.step(1)
+                print(self.reward)
 
         elif event.keycode == 39:
             if self.direction == 2:
@@ -334,6 +403,7 @@ class Snake(object):
             else:
                 self.direction = 0
                 self.step(1)
+                print(self.reward)
 
         elif event.keycode == 40:
             if self.direction == 3:
@@ -341,9 +411,11 @@ class Snake(object):
             else:
                 self.direction = 1
                 self.step(1)
+                print(self.reward)
 
     def step(self, head_direction):
-        """Move the snake one cell in head_direction (0 for the snake to turn
+        """
+        Move the snake one cell in head_direction (0 for the snake to turn
         left, 1 for the snake to go straight and 2 for going right).
         """
 
@@ -368,7 +440,6 @@ class Snake(object):
 
         if self.just_ate:
             # If the snake has just eaten, we create a new head to make it grow
-
             self.body[0].change_color()
 
             for body_part in self.body:
@@ -381,20 +452,18 @@ class Snake(object):
 
             # In case the new fruit just spawned where we are moving
             if FRUIT_X == self.head[0] and FRUIT_Y == self.head[1]:
-                self.just_ate = True
-
                 if self.canvas is not None:
                     self.canvas.delete(FRUIT)
 
                 spawn_fruit(self, self.canvas)
-                self.reward = 10
+                self.reward = self.EAT_REWARD
 
-            else:
+            elif moved_closer:
+                self.reward = self.CLOSER_REWARD
                 self.just_ate = False
-                if moved_closer:
-                    self.reward = 0.1
-                else:
-                    self.reward = -0.1
+            else:
+                self.reward = -self.CLOSER_REWARD
+                self.just_ate = False
 
         else:
             new_body = self.body[:-1]
@@ -417,13 +486,13 @@ class Snake(object):
                     self.canvas.delete(FRUIT)
 
                 spawn_fruit(self, self.canvas)
-                self.reward = 10
+                self.reward = self.EAT_REWARD
 
             elif moved_closer:
-                self.reward = 0.1
+                self.reward = self.CLOSER_REWARD
 
             else:
-                self.reward = -0.1
+                self.reward = -self.CLOSER_REWARD
 
     def get_pos(self, x, y):
         """Method to check if there is something at a specific position x,y.
@@ -459,7 +528,7 @@ class Snake(object):
 
     def died(self):
         self.dead = True
-        self.reward = -10
+        self.reward = self.DEATH_PUNISH
 
         for body_part in self.body:
             body_part.died()

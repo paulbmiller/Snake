@@ -10,14 +10,14 @@ torch.backends.cudnn.benchmark = True
 class DeepQNetwork(torch.nn.Module):
     def __init__(self, alpha):
         super(DeepQNetwork, self).__init__()
-        self.lin1 = torch.nn.Linear(11, 120)
-        self.lin2 = torch.nn.Linear(120, 120)
-        self.lin3 = torch.nn.Linear(120, 120)
-        self.lin4 = torch.nn.Linear(120, 3)
+        self.lin1 = torch.nn.Linear(11, 128)
+        self.lin2 = torch.nn.Linear(128, 128)
+        self.lin3 = torch.nn.Linear(128, 128)
+        self.lin4 = torch.nn.Linear(128, 3)
 
         self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
         self.loss = torch.nn.MSELoss()
-        self.lr = 1e-4
+        self.lr = 3e-4
 
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
