@@ -12,8 +12,7 @@ class DeepQNetwork(torch.nn.Module):
         super(DeepQNetwork, self).__init__()
         self.lin1 = torch.nn.Linear(11, 128)
         self.lin2 = torch.nn.Linear(128, 128)
-        self.lin3 = torch.nn.Linear(128, 128)
-        self.lin4 = torch.nn.Linear(128, 3)
+        self.lin3 = torch.nn.Linear(128, 4)
 
         self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
         self.loss = torch.nn.MSELoss()
@@ -32,14 +31,13 @@ class DeepQNetwork(torch.nn.Module):
         obs = torch.Tensor(x).to(self.device)
         obs = F.relu(self.lin1(obs))
         obs = F.relu(self.lin2(obs))
-        obs = F.relu(self.lin3(obs))
-        actions = self.lin4(obs)
+        actions = self.lin3(obs)
         return actions
 
 
 class DeepQNAgent(object):
     def __init__(self, gamma, epsilon, alpha, max_memory, eps_end=0,
-                 replace=10000, action_space=[0, 1, 2]):
+                 replace=10000, action_space=[0, 1, 2, 3]):
         self.GAMMA = gamma
         self.EPSILON = epsilon
         self.EPS_END = eps_end

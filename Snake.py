@@ -21,7 +21,7 @@ def from_grid(x):
 
 
 def random_direction():
-    return randint(0, 2)
+    return randint(0, 3)
 
 
 def spawn_fruit(snake, canvas):
@@ -78,8 +78,8 @@ def run_user():
             window.destroy()
 
 
-def run(display=False, debug=False, debug_every=10):
-    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=0.003, max_memory=50000,
+def run(display=False, debug=False, debug_every=10, num_games=100, alpha=0.003):
+    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=alpha, max_memory=50000,
                         replace=None)
 
     window = None
@@ -91,7 +91,7 @@ def run(display=False, debug=False, debug_every=10):
         state_old = s.get_state()
         game_ended = False
         while not game_ended and agent.mem_cntr < agent.mem_size:
-            action = randint(0, 2)
+            action = randint(0, 3)
             s.step(action)
             state_new = s.get_state()
             agent.store_transition(state_old, action, s.reward, state_new)
@@ -103,7 +103,6 @@ def run(display=False, debug=False, debug_every=10):
 
     scores = np.array([])
     eps_history = []
-    num_games = 100
     batch_size = 32
     window = None
     debug_cntr = 0
@@ -223,17 +222,16 @@ def run(display=False, debug=False, debug_every=10):
                 time.sleep(0.1)
                 window.destroy()
 
-            print("Score : {}, steps: {}, rewards: {}".format(s.score, steps,
-                                                              [s.EAT_REWARD,
-                                                               s.DEATH_PUNISH,
-                                                               s.CLOSER_REWARD
-                                                               ]))
+            print("Score : {}, acc_score : {}, steps: {}, rewards: {}".format(
+                s.score, round(s.acc_score, 1), steps,
+                [s.EAT_REWARD, s.DEATH_PUNISH, s.CLOSER_REWARD]
+                ))
 
     except KeyboardInterrupt:
         if window is not None:
             window.destroy()
 
-    print("Sum of scores after {} : {}".format(num_games, scores.sum()))
+    print("Sum of scores after {} : {}".format(j, scores.sum()))
 
 
 class Snake(object):
@@ -243,6 +241,7 @@ class Snake(object):
         self.size = 3   # Size of the body (does not include the head)
         self.canvas = canvas
         self.score = 0
+        self.acc_score = 0
         self.reward = 0
         self.CLOSER_REWARD = 0.1
         self.EAT_REWARD = 1
@@ -297,9 +296,9 @@ class Snake(object):
         state.append(fruit_above)
 
         right = (self.head[0]+1, self.head[1])
-        below = (self.head[0]+1, self.head[1])
-        left = (self.head[0]+1, self.head[1])
-        above = (self.head[0]+1, self.head[1])
+        below = (self.head[0], self.head[1]+1)
+        left = (self.head[0]-1, self.head[1])
+        above = (self.head[0], self.head[1]-1)
 
         cells = [left, above, right, below]
 
@@ -311,56 +310,16 @@ class Snake(object):
             else:
                 state.append(0)
 
-        """
-        right = [(self.head[0]+1, self.head[1]),(self.head[0]+2, self.head[1])]
-        below = [(self.head[0], self.head[1]+1),(self.head[0], self.head[1]+2)]
-        left = [(self.head[0]-1, self.head[1]),(self.head[0]-2, self.head[1])]
-        above = [(self.head[0], self.head[1]-1),(self.head[0], self.head[1]-2)]
-
-        cells = [left, above, right, below]
-
-        for i in range(4):
-            if self.direction == i:
-                state.extend([1,1])
-            elif self.check_danger(cells[i][0][0], cells[i][0][1]):
-                state.extend([1,1])
-            elif self.check_danger(cells[i][1][0], cells[i][1][1]):
-                state.extend([0,1])
-            else:
-                state.extend([0,0])
-
-
-        popped = (self.direction + 2) % 4
-        cells.pop(popped)
-
-        if popped == 1:
-            cells[0], cells[1], cells[2] = cells[1], cells[2], cells[0]
-        elif popped == 2:
-            cells[0], cells[1], cells[2] = cells[2], cells[0], cells[1]
-
-        for direction in cells:
-            if self.check_danger(direction[0][0], direction[0][1]):
-                state.extend([1,1])
-            elif self.check_danger(direction[1][0] , direction[1][1]):
-                state.extend([0,1])
-            else:
-                state.extend([0,0])
-        """
-
         return np.asarray(state)
 
     def state_reward(self):
         return self.get_state(), self.reward
 
-    def next_pos(self, head_direction):
-        """Define where the head of the snake is going to be in the next frame,
-        given the direction where the head is going and the general direction
-        of the snake."""
-
-        if head_direction == 0:
-            self.direction = (self.direction - 1) % 4
-        elif head_direction == 2:
-            self.direction = (self.direction + 1) % 4
+    def next_pos(self):
+        """
+        Define where the head of the snake is going to be in the next frame,
+        given the direction of the snake.
+        """
 
         if self.direction == 0:
             return (self.head[0]+1, self.head[1])
@@ -383,46 +342,24 @@ class Snake(object):
 
     def key(self, event):
         if event.keycode == 37:
-            if self.direction == 0:
-                return
-            else:
-                self.direction = 2
-                self.step(1)
-                print(self.reward)
+            self.direction = 2
+            self.step()
         elif event.keycode == 38:
-            if self.direction == 1:
-                return
-            else:
-                self.direction = 3
-                self.step(1)
-                print(self.reward)
-
+            self.direction = 3
+            self.step()
         elif event.keycode == 39:
-            if self.direction == 2:
-                return
-            else:
-                self.direction = 0
-                self.step(1)
-                print(self.reward)
-
+            self.direction = 0
+            self.step()
         elif event.keycode == 40:
-            if self.direction == 3:
-                return
-            else:
-                self.direction = 1
-                self.step(1)
-                print(self.reward)
+            self.direction = 1
+            self.step()
 
-    def step(self, head_direction):
-        """
-        Move the snake one cell in head_direction (0 for the snake to turn
-        left, 1 for the snake to go straight and 2 for going right).
-        """
-
+    def step(self, new_dir):
         if self.dead:
             return
 
-        new_head = self.next_pos(head_direction)
+        self.direction = new_dir
+        new_head = self.next_pos()
 
         if self.check_danger(new_head[0], new_head[1]):
             self.died()
@@ -440,11 +377,10 @@ class Snake(object):
 
         if self.just_ate:
             # If the snake has just eaten, we create a new head to make it grow
-            self.body[0].change_color()
-
             for body_part in self.body:
                 body_part.Id += 1
 
+            self.body[0].change_color()
             self.size += 1
 
             self.body.insert(0, Body(self.head[0], self.head[1], 0,
@@ -457,21 +393,24 @@ class Snake(object):
 
                 spawn_fruit(self, self.canvas)
                 self.reward = self.EAT_REWARD
+                self.acc_score += self.reward
 
             elif moved_closer:
                 self.reward = self.CLOSER_REWARD
+                self.acc_score += self.reward
                 self.just_ate = False
             else:
                 self.reward = -self.CLOSER_REWARD
+                self.acc_score += self.reward
                 self.just_ate = False
 
         else:
             new_body = self.body[:-1]
 
-            self.body[0].change_color()
             for body_part in self.body[:-1]:
                 body_part.Id += 1
 
+            self.body[0].change_color()
             self.body[-1].change_coords(self.head[0], self.head[1])
             self.body[-1].make_head()
             new_body.insert(0, self.body[-1])
@@ -487,15 +426,19 @@ class Snake(object):
 
                 spawn_fruit(self, self.canvas)
                 self.reward = self.EAT_REWARD
+                self.acc_score += self.reward
 
             elif moved_closer:
                 self.reward = self.CLOSER_REWARD
+                self.acc_score += self.reward
 
             else:
                 self.reward = -self.CLOSER_REWARD
+                self.acc_score += self.reward
 
     def get_pos(self, x, y):
-        """Method to check if there is something at a specific position x,y.
+        """
+        Method to check if there is something at a specific position x,y.
         It will either return "n" (for nothing), "s" (for snake), "f" for
         fruit, "w" (for wall).
         """
@@ -509,7 +452,8 @@ class Snake(object):
             return "n"
 
     def change_dir(self, new_dir):
-        """This method will change the direction in which the snake is heading
+        """
+        This method will change the direction in which the snake is heading
         only if the new direction is not making it go into itself or the
         direction isn't being changed.
         """
@@ -529,6 +473,7 @@ class Snake(object):
     def died(self):
         self.dead = True
         self.reward = self.DEATH_PUNISH
+        self.acc_score += self.DEATH_PUNISH
 
         for body_part in self.body:
             body_part.died()
@@ -570,7 +515,7 @@ class Body(object):
     def make_head(self):
         self.Id = 0
         if self.canvas is not None:
-            self.canvas.itemconfigure(self.obj, fill="dodger blue")
+            self.canvas.itemconfigure(self.obj, fill="blue")
 
     def change_coords(self, x, y):
         self.x = x
@@ -591,5 +536,5 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=False, debug=False, debug_every=1)
+    run(display=False, debug=False, debug_every=1, num_games=1000, alpha=0.003)
     # run_user()
