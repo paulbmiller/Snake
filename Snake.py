@@ -4,6 +4,7 @@ import numpy as np
 import time
 from random import randint
 from DeepQLearning import DeepQNAgent
+from RL import PolicyNetwork, Policy
 
 WINDOW_HEIGHT = 800
 WINDOW_WIDTH = 800
@@ -21,7 +22,7 @@ def from_grid(x):
 
 
 def random_direction():
-    return randint(0, 3)
+    return randint(0, 2)
 
 
 def spawn_fruit(snake, canvas):
@@ -78,160 +79,56 @@ def run_user():
             window.destroy()
 
 
-def run(display=False, debug=False, debug_every=10, num_games=100, alpha=0.003):
-    agent = DeepQNAgent(gamma=0.95, epsilon=1.0, alpha=alpha, max_memory=50000,
-                        replace=None)
-
+def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games):
+    agent = Policy(epsilon=epsilon, alpha=alpha, discount=discount,
+                   eps_end=eps_end)
     window = None
-
-    print("Initializing memory")
-
-    while agent.mem_cntr < agent.mem_size:
-        window, s, can = start_snake()
-        state_old = s.get_state()
-        game_ended = False
-        while not game_ended and agent.mem_cntr < agent.mem_size:
-            action = randint(0, 3)
-            s.step(action)
-            state_new = s.get_state()
-            agent.store_transition(state_old, action, s.reward, state_new)
-            state_old = state_new
-            if s.dead:
-                game_ended = True
-
-    print("Done initializing memory of size {}".format(agent.mem_cntr))
-
     scores = np.array([])
-    eps_history = []
-    batch_size = 32
-    window = None
-    debug_cntr = 0
     i = 1
+    print("Starting run")
 
     try:
-        while agent.EPSILON > 0:
-            game_ended = False
-            steps = 0
-
+        while i < nb_games:
+            if i > 1000:
+                display=True
             str_out = "Starting game {}".format(i)
-            if agent.EPSILON == 0:
-                print(str_out)
-            else:
-                str_out += ", epsilon : {:.3f}".format(agent.EPSILON)
-                print(str_out)
-
-            eps_history.append(agent.EPSILON)
-
-            if agent.EPSILON == 0 and i % debug_every == 0 and display:
+            str_out += ", epsilon : {:.3f}".format(agent.epsilon)
+            print(str_out)
+            if display:
                 win_title = 'Snake {}'.format(i)
                 window, s, can = start_snake(display=True,
                                              display_title=win_title)
-                window.update()
-
             else:
                 window, s, can = start_snake(display=False)
 
-            state_old = s.get_state()
-            while not game_ended:
+            while not s.dead:
                 if window is not None:
                     time.sleep(0.05)
 
-                action = agent.choose_action(state_old)
+                state = s.get_state()
+                action = agent.choose_action(state)
                 s.step(action)
+                agent.store_transition(state, action, s.reward)
 
-                state_new = s.get_state()
-                agent.store_transition(state_old, action, s.reward, state_new)
-
-                steps += 1
                 if window is not None:
                     window.update()
-
-                state_old = state_new
-
-                if debug_cntr >= debug_every and debug:
-                    agent.learn(batch_size, debug=True)
-                    debug_cntr = 0
-                else:
-                    agent.learn(batch_size, debug=False)
-                    if debug:
-                        debug_cntr += 1
-
-                if s.dead:
-                    game_ended = True
 
             if window is not None:
                 time.sleep(0.1)
                 window.destroy()
 
-            print("Score : {}, steps: {}".format(s.score, steps))
+            agent.learn(batch_size)
+
+            print("Score : {}, steps: {}".format(s.score, agent.steps))
             i += 1
-
-        for j in range(1, num_games+1):
-            game_ended = False
-            steps = 0
-
-            str_out = "Starting game {}".format(j)
-            if agent.EPSILON == 0:
-                print(str_out)
-            else:
-                str_out += ", epsilon : {:.3f}".format(agent.EPSILON)
-                print(str_out)
-
-            eps_history.append(agent.EPSILON)
-
-            if agent.EPSILON == 0 and i % debug_every == 0 and display:
-                win_title = 'Snake {}'.format(j)
-                window, s, can = start_snake(display=True,
-                                             display_title=win_title)
-                window.update()
-
-            else:
-                window, s, can = start_snake(display=False)
-
-            state_old = s.get_state()
-            while not game_ended:
-                if window is not None:
-                    time.sleep(0.05)
-
-                action = agent.choose_action(state_old)
-                s.step(action)
-
-                state_new = s.get_state()
-                agent.store_transition(state_old, action, s.reward, state_new)
-
-                steps += 1
-                if window is not None:
-                    window.update()
-
-                state_old = state_new
-
-                if debug_cntr >= debug_every and debug:
-                    agent.learn(batch_size, debug=True)
-                    debug_cntr = 0
-                else:
-                    agent.learn(batch_size, debug=False)
-                    if debug:
-                        debug_cntr += 1
-
-                if s.dead:
-                    game_ended = True
-
+            agent.steps = 0
             scores = np.append(scores, s.score)
-
-            if window is not None:
-                time.sleep(0.1)
-                window.destroy()
-
-            print("Score : {}, acc_score : {}, steps: {}, rewards: {}".format(
-                s.score, round(s.acc_score, 1), steps,
-                [s.EAT_REWARD, s.DEATH_PUNISH, s.CLOSER_REWARD]
-                ))
 
     except KeyboardInterrupt:
         if window is not None:
             window.destroy()
 
-    print("Sum of scores after {} : {}".format(j, scores.sum()))
+    print("Sum of scores after {} games : {}".format(i-1, scores.sum()))
 
 
 class Snake(object):
@@ -241,9 +138,7 @@ class Snake(object):
         self.size = 3   # Size of the body (does not include the head)
         self.canvas = canvas
         self.score = 0
-        self.acc_score = 0
         self.reward = 0
-        self.CLOSER_REWARD = 0.1
         self.EAT_REWARD = 1
         self.DEATH_PUNISH = -1
 
@@ -251,7 +146,7 @@ class Snake(object):
         self.head = (W//2, H//2)
 
         """Choose a random direction in which to start (0 for right, 1 for
-        down, 2 for left and 3 for up and initialize the snake going straight.
+        down, 2 for left and 3 for up) and initialize the snake going straight.
         """
         self.direction = randint(0, 3)
 
@@ -341,37 +236,38 @@ class Snake(object):
     def key(self, event):
         if event.keycode == 37:
             self.direction = 2
-            self.step()
+            self.step(1)
         elif event.keycode == 38:
             self.direction = 3
-            self.step()
+            self.step(1)
         elif event.keycode == 39:
             self.direction = 0
-            self.step()
+            self.step(1)
         elif event.keycode == 40:
             self.direction = 1
-            self.step()
+            self.step(1)
 
-    def step(self, new_dir):
+    def step(self, next_turn):
         if self.dead:
             return
 
-        self.direction = new_dir
+        if next_turn == 0:
+            # turn right
+            self.direction = (self.direction + 1) % 4
+        elif next_turn == 1:
+            # go straight
+            pass
+        else:
+            self.direction = (self.direction - 1) % 4
+
         new_head = self.next_pos()
 
         if self.check_danger(new_head[0], new_head[1]):
             self.died()
             return
 
-        dist_fruit0 = self.get_dist_from_fruit()
         # Make the head become part of the body
         self.head = new_head
-        dist_fruit1 = self.get_dist_from_fruit()
-
-        if dist_fruit0 > dist_fruit1:
-            moved_closer = True
-        else:
-            moved_closer = False
 
         if self.just_ate:
             # If the snake has just eaten, we create a new head to make it grow
@@ -391,15 +287,8 @@ class Snake(object):
 
                 spawn_fruit(self, self.canvas)
                 self.reward = self.EAT_REWARD
-                self.acc_score += self.reward
 
-            elif moved_closer:
-                self.reward = self.CLOSER_REWARD
-                self.acc_score += self.reward
-                self.just_ate = False
             else:
-                self.reward = -self.CLOSER_REWARD
-                self.acc_score += self.reward
                 self.just_ate = False
 
         else:
@@ -424,15 +313,6 @@ class Snake(object):
 
                 spawn_fruit(self, self.canvas)
                 self.reward = self.EAT_REWARD
-                self.acc_score += self.reward
-
-            elif moved_closer:
-                self.reward = self.CLOSER_REWARD
-                self.acc_score += self.reward
-
-            else:
-                self.reward = -self.CLOSER_REWARD
-                self.acc_score += self.reward
 
     def get_pos(self, x, y):
         """
@@ -449,21 +329,7 @@ class Snake(object):
         else:
             return "n"
 
-    def change_dir(self, new_dir):
-        """
-        This method will change the direction in which the snake is heading
-        only if the new direction is not making it go into itself or the
-        direction isn't being changed.
-        """
-        if self.direction == 0 or self.direction == 2:
-            if new_dir == 1 or new_dir == 3:
-                self.direction = new_dir
-
-        if self.direction == 1 or self.direction == 3:
-            if new_dir == 0 or new_dir == 2:
-                self.direction = new_dir
-
-    def get_dist_from_fruit(self):
+    def dist_from_fruit(self):
         dist = abs(FRUIT_X - self.head[0])
         dist += abs(FRUIT_Y - self.head[1])
         return dist
@@ -471,7 +337,6 @@ class Snake(object):
     def died(self):
         self.dead = True
         self.reward = self.DEATH_PUNISH
-        self.acc_score += self.DEATH_PUNISH
 
         for body_part in self.body:
             body_part.died()
@@ -534,5 +399,6 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=False, debug=False, debug_every=1, num_games=1000, alpha=0.003)
+    run(display=False, epsilon=1, alpha=1e-3, discount=0.75, eps_end=0,
+        batch_size=8, nb_games=2000)
     # run_user()

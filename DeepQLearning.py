@@ -12,7 +12,7 @@ class DeepQNetwork(torch.nn.Module):
         super(DeepQNetwork, self).__init__()
         self.lin1 = torch.nn.Linear(12, 128)
         self.lin2 = torch.nn.Linear(128, 128)
-        self.lin3 = torch.nn.Linear(128, 4)
+        self.lin3 = torch.nn.Linear(128, 3)
 
         self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
         self.loss = torch.nn.MSELoss()
@@ -36,7 +36,7 @@ class DeepQNetwork(torch.nn.Module):
 
 
 class DeepQNAgent(object):
-    def __init__(self, gamma, epsilon, alpha, max_memory, eps_end=0,
+    def __init__(self, gamma, epsilon, alpha, max_memory, eps_end=0.01,
                  replace=10000, action_space=[0, 1, 2, 3]):
         self.GAMMA = gamma
         self.EPSILON = epsilon
