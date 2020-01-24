@@ -1,0 +1,2 @@
+nb_games,discount,nn_lr,policy_lr,eps_start,eps_end,batch_size,string_identification
+2500,0.75,0.001,0.001,1.003,0.003,8,07c24c6462384e00a7f5800f96690d72

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 # Since input sizes don't vary
 torch.backends.cudnn.benchmark = True
@@ -36,7 +35,7 @@ class PolicyNetwork(torch.nn.Module):
             self.device = torch.device("cpu")
             print("Running on CPU")
         """
-        
+
         self.device = torch.device("cpu")
 
     def forward(self, state):
@@ -117,7 +116,8 @@ class Policy(object):
             targets[i][int(self.memory_actions[i])] = self.memory_rewards[i]
         mem_start = 0
         mem_end = 0
-        torch_states = torch.from_numpy(self.memory_states).to(self.model.device)
+        torch_states = torch.from_numpy(
+            self.memory_states).to(self.model.device)
         torch_targets = torch.from_numpy(targets)
         while mem_start < len(self.memory_actions):
             mem_end = mem_start + batch_size - 1
@@ -135,6 +135,8 @@ class Policy(object):
 
         if self.epsilon > self.eps_end:
             self.epsilon -= self.lr
+            if self.epsilon < self.eps_end:
+                self.epsilon = self.eps_end
 
         self.memory_states = None
         self.memory_actions = np.array([])

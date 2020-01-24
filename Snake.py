@@ -2,9 +2,14 @@
 import tkinter as tk
 import numpy as np
 import time
+import uuid
+import csv
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
 from random import randint
-from DeepQLearning import DeepQNAgent
-from RL import PolicyNetwork, Policy
+# from DeepQLearning import DeepQNAgent
+from RL import Policy
 
 WINDOW_HEIGHT = 800
 WINDOW_WIDTH = 800
@@ -66,6 +71,59 @@ def start_snake(display=False, display_title='Snake'):
     return window, s, can
 
 
+def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs):
+    # Create a file where we will store the game results
+    unique_id = uuid.uuid4().hex
+    filename = 'results//' + unique_id
+    filename = filename + '.csv'
+    with open(filename, 'w', newline='') as f:
+        dw = csv.DictWriter(f, fieldnames=['Game_id', 'Score', 'Steps',
+                                           'Epsilon'])
+        dw.writeheader()
+
+    # Add this run to an index, so that we know what runs have what params
+    results_filename = 'results//results_index.csv'
+    if not os.path.exists(results_filename):
+        with open(results_filename, 'w', newline='') as f:
+            dw = csv.DictWriter(f, fieldnames=['nb_games', 'discount',
+                                               'nn_lr', 'policy_lr',
+                                               'eps_start', 'eps_end',
+                                               'batch_size',
+                                               'string_identification'])
+            dw.writeheader()
+
+    with open(results_filename, 'a', newline='') as f:
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow([nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs,
+                         unique_id])
+
+    return filename
+
+
+def store_data(filename, game_id, score, steps, epsilon):
+    with open(filename, 'a', newline='') as f:
+        writer = csv.writer(f, delimiter=',')
+        writer.writerow([game_id, score, steps, epsilon])
+
+
+def plot(filename, mean_every=20, column='Score', save_fig=False):
+    # Plot the given column of the csv for the games
+    i = 0
+    new_df = pd.DataFrame([], columns=[column])
+    df = pd.read_csv(filename)
+    df = df[column]
+    title = 'Mean value of {} every {} games'.format(column.lower(),
+                                                     mean_every)
+    while i < len(df):
+        new_df = new_df.append(pd.DataFrame([df[i:i+mean_every].mean()]),
+                               ignore_index=True)
+        i += mean_every
+    fig = new_df.plot(title=title, legend=False).get_figure()
+
+    if save_fig:
+        fig.savefig(filename[:-4] + column.lower() + '.pdf')
+
+
 def run_user():
     window, s, can = start_snake(display=True)
     can.bind("<Key>", s.key)
@@ -86,11 +144,11 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games):
     scores = np.array([])
     i = 1
     print("Starting run")
+    results_filename = init_data_files(nb_games, discount, alpha, agent.lr,
+                                       epsilon, eps_end, batch_size)
 
     try:
-        while i < nb_games:
-            if i > 1000:
-                display=True
+        while i <= nb_games:
             str_out = "Starting game {}".format(i)
             str_out += ", epsilon : {:.3f}".format(agent.epsilon)
             print(str_out)
@@ -120,9 +178,15 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games):
             agent.learn(batch_size)
 
             print("Score : {}, steps: {}".format(s.score, agent.steps))
+
+            scores = np.append(scores, s.score)
+            store_data(results_filename, game_id=i, score=s.score,
+                       steps=agent.steps, epsilon=agent.epsilon)
             i += 1
             agent.steps = 0
-            scores = np.append(scores, s.score)
+
+        plot(results_filename, mean_every=20, column='Score', save_fig=True)
+        plot(results_filename, mean_every=20, column='Steps', save_fig=True)
 
     except KeyboardInterrupt:
         if window is not None:
@@ -399,6 +463,6 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=False, epsilon=1, alpha=1e-3, discount=0.75, eps_end=0,
-        batch_size=8, nb_games=2000)
+    run(display=False, epsilon=1.003, alpha=1e-3, discount=0.75, eps_end=0.003,
+        batch_size=8, nb_games=2500)
     # run_user()
