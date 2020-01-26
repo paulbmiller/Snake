@@ -1,2 +1,13 @@
-nb_games,discount,nn_lr,policy_lr,eps_start,eps_end,batch_size,string_identification
-2500,0.75,0.001,0.001,1.003,0.003,8,07c24c6462384e00a7f5800f96690d72
+nb_games,discount,nn_lr,policy_lr,eps_start,eps_end,batch_size,Eat_reward,Death_Pun,Step_pun,Optimizer,Loss_fn,string_identification
+2500,0.8,0.001,0.001,1.001,0.001,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),ee134e6696d54f4da0cddfcc62f7a545
+2500,0.8,0.001,0.001,1.002,0.002,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),a9257e661e8b498cb19bbcfbd73e673c
+10000,0.8,0.001,0.001,1.002,0.002,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),5576a039dbf0452f8ef258ca2031c261
+10000,0.8,0.001,0.001,1.005,0.005,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),6c941225e27f4d02bfc31f540ca234ef
+10000,0.8,0.001,0.001,1.01,0.01,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),1fe9c1b6f8cd4639a7767c5a50a9a025
+10000,0.8,0.001,0.001,1.003,0.003,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),c7ca45d70ca44cf5bb0cd11391beb7ea
+10000,0.8,0.001,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),e278c84ac3294b3a893259954772c1f4
+20000,0.8,0.001,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),e47bd00f2e004bfb89b9ca358f912f5d
+2500,0.8,0.001,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),b5e7ec0745484664824806d960f2ba63
+2500,0.8,0.01,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),873704532398408b83d286fca754e512
+2500,0.8,0.0005,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),714a31ddfa424239a6292bbc4faeea70
+2500,0.8,0.0001,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),0f45fe917b3d401bba1fbcea1d2963bc

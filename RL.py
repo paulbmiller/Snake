@@ -12,7 +12,7 @@ class PolicyNetwork(torch.nn.Module):
     what action will produce most return.
     """
 
-    def __init__(self, alpha):
+    def __init__(self, alpha, optim, loss_fn):
         super(PolicyNetwork, self).__init__()
         self.lin_seq = torch.nn.Sequential(
             torch.nn.Linear(12, 64),
@@ -24,8 +24,8 @@ class PolicyNetwork(torch.nn.Module):
             torch.nn.Linear(64, 3)
             )
 
-        self.optimizer = torch.optim.RMSprop(self.parameters(), lr=alpha)
-        self.loss = torch.nn.MSELoss()
+        self.optimizer = optim(self.parameters(), lr=alpha)
+        self.loss = loss_fn()
 
         """
         if torch.cuda.is_available():
@@ -54,13 +54,14 @@ class Policy(object):
     """
 
     def __init__(self, epsilon, alpha, discount=0.5, eps_end=0.05,
-                 action_space=[0, 1, 2], lr=1e-3):
+                 action_space=[0, 1, 2], lr=1e-3, optim=torch.optim.RMSprop,
+                 loss_fn=torch.nn.MSELoss):
         self.epsilon = epsilon
         self.discount = discount
         self.eps_end = eps_end
         self.action_space = action_space
         self.steps = 0
-        self.model = PolicyNetwork(alpha)
+        self.model = PolicyNetwork(alpha, optim, loss_fn)
         self.memory_states = None
         self.memory_actions = np.array([])
         self.memory_rewards = np.array([])

@@ -5,6 +5,7 @@ import time
 import uuid
 import csv
 import os
+import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 from random import randint
@@ -48,7 +49,7 @@ def spawn_fruit(snake, canvas):
                                         fill="red")
 
 
-def start_snake(display=False, display_title='Snake'):
+def start_snake(eat, death, step, display=False, display_title='Snake'):
     if display:
         window = tk.Tk()
 
@@ -64,14 +65,15 @@ def start_snake(display=False, display_title='Snake'):
     else:
         window, can = None, None
 
-    s = Snake(can)
+    s = Snake(can, eat, death, step)
 
     spawn_fruit(s, can)
 
     return window, s, can
 
 
-def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs):
+def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat, death,
+                    step, optim, loss_fn):
     # Create a file where we will store the game results
     unique_id = uuid.uuid4().hex
     filename = 'results//' + unique_id
@@ -88,14 +90,16 @@ def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs):
             dw = csv.DictWriter(f, fieldnames=['nb_games', 'discount',
                                                'nn_lr', 'policy_lr',
                                                'eps_start', 'eps_end',
-                                               'batch_size',
+                                               'batch_size', 'Eat_reward',
+                                               'Death_Pun', 'Step_pun',
+                                               'Optimizer', 'Loss_fn',
                                                'string_identification'])
             dw.writeheader()
 
     with open(results_filename, 'a', newline='') as f:
         writer = csv.writer(f, delimiter=',')
-        writer.writerow([nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs,
-                         unique_id])
+        writer.writerow([nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat,
+                         death, step, str(optim), str(loss_fn()), unique_id])
 
     return filename
 
@@ -109,23 +113,25 @@ def store_data(filename, game_id, score, steps, epsilon):
 def plot(filename, mean_every=20, column='Score', save_fig=False):
     # Plot the given column of the csv for the games
     i = 0
-    new_df = pd.DataFrame([], columns=[column])
+    new_ser = pd.Series()
     df = pd.read_csv(filename)
     df = df[column]
     title = 'Mean value of {} every {} games'.format(column.lower(),
                                                      mean_every)
+
     while i < len(df):
-        new_df = new_df.append(pd.DataFrame([df[i:i+mean_every].mean()]),
-                               ignore_index=True)
+        new_ser = new_ser.append(pd.Series([df[i:i+mean_every].mean()]),
+                                 ignore_index=True)
         i += mean_every
-    fig = new_df.plot(title=title, legend=False).get_figure()
+    new_ser.index = new_ser.index * mean_every
+    fig = new_ser.plot(title=title, legend=False).get_figure()
 
     if save_fig:
         fig.savefig(filename[:-4] + column.lower() + '.pdf')
 
 
 def run_user():
-    window, s, can = start_snake(display=True)
+    window, s, can = start_snake(eat=0, death=0, step=0, display=True)
     can.bind("<Key>", s.key)
     can.focus_set()
 
@@ -137,15 +143,17 @@ def run_user():
             window.destroy()
 
 
-def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games):
+def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
+        death, step, optim, loss_fn):
     agent = Policy(epsilon=epsilon, alpha=alpha, discount=discount,
-                   eps_end=eps_end)
+                   eps_end=eps_end, optim=optim, loss_fn=loss_fn)
     window = None
     scores = np.array([])
     i = 1
     print("Starting run")
     results_filename = init_data_files(nb_games, discount, alpha, agent.lr,
-                                       epsilon, eps_end, batch_size)
+                                       epsilon, eps_end, batch_size, eat,
+                                       death, step, optim, loss_fn)
 
     try:
         while i <= nb_games:
@@ -154,10 +162,10 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games):
             print(str_out)
             if display:
                 win_title = 'Snake {}'.format(i)
-                window, s, can = start_snake(display=True,
+                window, s, can = start_snake(eat, death, step, display=True,
                                              display_title=win_title)
             else:
-                window, s, can = start_snake(display=False)
+                window, s, can = start_snake(eat, death, step, display=False)
 
             while not s.dead:
                 if window is not None:
@@ -185,26 +193,33 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games):
             i += 1
             agent.steps = 0
 
+        plt.figure(0)
         plot(results_filename, mean_every=20, column='Score', save_fig=True)
+        plt.figure(1)
         plot(results_filename, mean_every=20, column='Steps', save_fig=True)
 
     except KeyboardInterrupt:
         if window is not None:
             window.destroy()
+        plt.figure(0)
+        plot(results_filename, mean_every=20, column='Score', save_fig=True)
+        plt.figure(1)
+        plot(results_filename, mean_every=20, column='Steps', save_fig=True)
 
     print("Sum of scores after {} games : {}".format(i-1, scores.sum()))
 
 
 class Snake(object):
-    def __init__(self, canvas):
+    def __init__(self, canvas, eat, death, step):
         self.dead = False
         self.just_ate = False
         self.size = 3   # Size of the body (does not include the head)
         self.canvas = canvas
         self.score = 0
         self.reward = 0
-        self.EAT_REWARD = 1
-        self.DEATH_PUNISH = -1
+        self.EAT_REWARD = eat
+        self.DEATH_PUNISH = death
+        self.STEP_PUNISH = step
 
         # x and y position of the head
         self.head = (W//2, H//2)
@@ -354,6 +369,7 @@ class Snake(object):
 
             else:
                 self.just_ate = False
+                self.reward = self.STEP_PUNISH
 
         else:
             new_body = self.body[:-1]
@@ -377,6 +393,8 @@ class Snake(object):
 
                 spawn_fruit(self, self.canvas)
                 self.reward = self.EAT_REWARD
+            else:
+                self.reward = self.STEP_PUNISH
 
     def get_pos(self, x, y):
         """
@@ -463,6 +481,7 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=False, epsilon=1.003, alpha=1e-3, discount=0.75, eps_end=0.003,
-        batch_size=8, nb_games=2500)
+    run(display=False, epsilon=1.004, alpha=1e-4, discount=0.8, eps_end=0.004,
+        batch_size=8, nb_games=20000, eat=1, death=-1, step=0,
+        optim=torch.optim.Adam, loss_fn=torch.nn.MSELoss)
     # run_user()
