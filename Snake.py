@@ -12,6 +12,8 @@ from random import randint
 # from DeepQLearning import DeepQNAgent
 from RL import Policy
 
+
+# ----- CONSTANTS -----
 WINDOW_HEIGHT = 800
 WINDOW_WIDTH = 800
 GRID_SIZE = 40
@@ -19,6 +21,7 @@ H = WINDOW_HEIGHT // GRID_SIZE
 W = WINDOW_WIDTH // GRID_SIZE
 
 
+# ----- FUNCTIONS -----
 def to_grid(x):
     return x * GRID_SIZE
 
@@ -32,6 +35,21 @@ def random_direction():
 
 
 def spawn_fruit(snake, canvas):
+    """
+    Function to spawn a new fruit
+
+    Parameters
+    ----------
+    snake : Snake
+        Instance of the Snake class.
+    canvas : Canvas
+        Tkinter.Canvas instance.
+
+    Returns
+    -------
+    None.
+
+    """
     global FRUIT_X, FRUIT_Y, FRUIT
 
     while True:
@@ -50,6 +68,32 @@ def spawn_fruit(snake, canvas):
 
 
 def start_snake(eat, death, step, display=False, display_title='Snake'):
+    """
+    Function to initiate the Snake class and its display if needed.
+
+    Parameters
+    ----------
+    eat : int
+        DESCRIPTION.
+    death : int
+        DESCRIPTION.
+    step : int
+        Punishment for taking steps. The default is 0.
+    display : bool, optional
+        Whether we want to display the game with Tkinter. The default is False.
+    display_title : string, optional
+        Title of the display window. The default is 'Snake'.
+
+    Returns
+    -------
+    window : Tk
+        Tkinter.Tk instance.
+    s : Snake
+        Instance of the snake class.
+    can : Canvas
+        Tkinter.Canvas instance.
+
+    """
     if display:
         window = tk.Tk()
 
@@ -74,7 +118,44 @@ def start_snake(eat, death, step, display=False, display_title='Snake'):
 
 def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat, death,
                     step, optim, loss_fn):
-    # Create a file where we will store the game results
+    """
+    Create the CSV files where we will store the results.
+
+    Parameters
+    ----------
+    nb_games : int
+        Number of games the snake will train on.
+    disc : float
+        Discount value for the discounted reward system.
+    nn_lr : float
+        Learning rate of the Neural Net from the PolicyNetwork instance.
+    pol_lr : float
+        Rate at which the policy will decrease epsilon from eps0 to eps1.
+    eps0 : float
+        Starting epsilon for the policy (i.e. how often we choose a random
+        value).
+    eps1 : float
+        Ending epsilon for the policy (rate at which we will choose a random
+        action i.e. exploration rate).
+    bs : int
+        Batch size for the Neural Net learning.
+    eat : int or float
+        Reward for eating the fruit.
+    death : int or float
+        Punishment for dying.
+    step : int or float
+        Punishment for taking steps.
+    optim : torch.optim.*
+        Torch optimizer for the Neural Net.
+    loss_fn : torch.nn.*
+        Torch Loss function for the Neural Net.
+
+    Returns
+    -------
+    filename : string
+        Name of the file to which we will write results from each game.
+
+    """
     unique_id = uuid.uuid4().hex
     filename = 'results//' + unique_id
     filename = filename + '.csv'
@@ -105,13 +186,36 @@ def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat, death,
 
 
 def store_data(filename, game_id, score, steps, epsilon):
+    """
+    Function to store the data from one game to the file with name ´filename´.
+    """
     with open(filename, 'a', newline='') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow([game_id, score, steps, epsilon])
 
 
 def plot(filename, mean_every=20, column='Score', save_fig=False):
-    # Plot the given column of the csv for the games
+    """
+    Function which plots the game results contained in a file. It uses the mean
+    value over ´mean_every´ samples in order for the graph to be more readable.
+
+    Parameters
+    ----------
+    filename : Name of the file which contains results for each game.
+        DESCRIPTION.
+    mean_every : int, optional
+        DESCRIPTION. The default is 20.
+    column : string, optional
+        Column name which we will plot. The default is 'Score'.
+    save_fig : bool, optional
+        Whether we save the figure with the name ´filename´+column. The default
+        is False.
+
+    Returns
+    -------
+    None.
+
+    """
     i = 0
     new_ser = pd.Series()
     df = pd.read_csv(filename)
@@ -131,6 +235,10 @@ def plot(filename, mean_every=20, column='Score', save_fig=False):
 
 
 def run_user():
+    """
+    Starts a window where we can control the snake with the keys WASD. Used for
+    debugging.
+    """
     window, s, can = start_snake(eat=0, death=0, step=0, display=True)
     can.bind("<Key>", s.key)
     can.focus_set()
@@ -145,6 +253,43 @@ def run_user():
 
 def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
         death, step, optim, loss_fn):
+    """
+    Main function.
+
+    Parameters
+    ----------
+    display : bool
+        Whether we want to display the window with Tkinter or not.
+    epsilon : float
+        Starting epsilon for the policy (i.e. how often we choose a random
+        value).
+    alpha : float
+        Learning rate for the Neural Net optimizer.
+    discount : float
+        Value for the discounted reward system.
+    eps_end : float
+        Ending epsilon for the policy (rate at which we will choose a random
+        action i.e. exploration rate).
+    batch_size : int
+        DESCRIPTION.
+    nb_games : int
+        DESCRIPTION.
+    eat : int or float
+        Reward for eating the fruit.
+    death : int or float
+        Punishment for dying.
+    step : int or float
+        Punishment for taking steps.
+    optim : torch.optim.*
+        Torch optimizer for the Neural Net.
+    loss_fn : torch.nn.*
+        Torch Loss function for the Neural Net.
+
+    Returns
+    -------
+    None.
+
+    """
     agent = Policy(epsilon=epsilon, alpha=alpha, discount=discount,
                    eps_end=eps_end, optim=optim, loss_fn=loss_fn)
     window = None
@@ -209,6 +354,7 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
     print("Sum of scores after {} games : {}".format(i-1, scores.sum()))
 
 
+# ----- CLASSES -----
 class Snake(object):
     def __init__(self, canvas, eat, death, step):
         self.dead = False
@@ -252,6 +398,19 @@ class Snake(object):
                                       self.canvas))
 
     def get_state(self):
+        """
+        Function which retards the state of the state, which will be an array
+        containing will be a vector of 12 values:
+            - 4 boolean values for the direction the snake is going in
+            - 4 boolean values if the fruit is below, above, left or right
+            - 4 boolean values which will warn the snake of immediate danger
+
+        Returns
+        -------
+        np.array
+            Numpy array of the state of the snake (which will be the NN input).
+
+        """
         state = []
 
         directions = [0, 0, 0, 0]
@@ -327,6 +486,20 @@ class Snake(object):
             self.step(1)
 
     def step(self, next_turn):
+        """
+        Take a step in the ´next_turn´ direction.
+
+        Parameters
+        ----------
+        next_turn : int
+            Direction for the next step: 0=left, 1=straight, 2=right.
+
+        Returns
+        -------
+        None.
+
+        """
+
         if self.dead:
             return
 
@@ -396,26 +569,6 @@ class Snake(object):
             else:
                 self.reward = self.STEP_PUNISH
 
-    def get_pos(self, x, y):
-        """
-        Method to check if there is something at a specific position x,y.
-        It will either return "n" (for nothing), "s" (for snake), "f" for
-        fruit, "w" (for wall).
-        """
-        if (x, y) in self.body or [x, y] == self.head:
-            return "s"
-        elif FRUIT_X == x and FRUIT_Y == y:
-            return "f"
-        elif x <= 0 or x >= W or y <= 0 or y >= H:
-            return "w"
-        else:
-            return "n"
-
-    def dist_from_fruit(self):
-        dist = abs(FRUIT_X - self.head[0])
-        dist += abs(FRUIT_Y - self.head[1])
-        return dist
-
     def died(self):
         self.dead = True
         self.reward = self.DEATH_PUNISH
@@ -481,7 +634,7 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=False, epsilon=1.004, alpha=1e-5, discount=0.8, eps_end=0.004,
+    run(display=False, epsilon=1.01, alpha=1e-5, discount=0.8, eps_end=0.01,
         batch_size=8, nb_games=100000, eat=1, death=-1, step=0,
-        optim=torch.optim.Adam, loss_fn=torch.nn.MSELoss)
+        optim=torch.optim.RMSprop, loss_fn=torch.nn.MSELoss)
     # run_user()
