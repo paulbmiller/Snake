@@ -634,7 +634,7 @@ class Body(object):
 
 
 if __name__ == "__main__":
-    run(display=False, epsilon=1.01, alpha=1e-5, discount=0.8, eps_end=0.01,
-        batch_size=8, nb_games=100000, eat=1, death=-1, step=0,
-        optim=torch.optim.RMSprop, loss_fn=torch.nn.MSELoss)
+    run(display=False, epsilon=1.004, alpha=1e-5, discount=0.8, eps_end=0.004,
+        batch_size=8, nb_games=4750, eat=1, death=-1, step=0,
+        optim=torch.optim.Adam, loss_fn=torch.nn.MSELoss)
     # run_user()
