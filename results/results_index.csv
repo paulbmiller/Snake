@@ -17,3 +17,6 @@ nb_games,discount,nn_lr,policy_lr,eps_start,eps_end,batch_size,Eat_reward,Death_
 10000,0.8,1e-05,0.001,1.01,0.01,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),d7f84985056d40109b0c02c7cd83dd2f
 100000,0.8,1e-05,0.001,1.01,0.01,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),17de242278da45bfb9875fbb9a10ae51
 100000,0.8,1e-05,0.001,1.01,0.01,8,1,-1,0,<class 'torch.optim.rmsprop.RMSprop'>,MSELoss(),b239103abbad4969a4307e8e66650783
+20000,0.8,1e-05,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),ab27a31bee2f4196a44a1481b90b6cc1
+100000,0.8,1e-05,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),2d3d00f6d3024c1b9d8cf10694af9778
+1000000,0.8,1e-05,0.001,1.004,0.004,8,1,-1,0,<class 'torch.optim.adam.Adam'>,MSELoss(),6f4ec6d86a8f4e6f9fc9ab77ca861d2e

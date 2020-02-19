@@ -15,7 +15,7 @@ class PolicyNetwork(torch.nn.Module):
     def __init__(self, alpha, optim, loss_fn):
         super(PolicyNetwork, self).__init__()
         self.lin_seq = torch.nn.Sequential(
-            torch.nn.Linear(12, 64),
+            torch.nn.Linear(21, 64),
             torch.nn.ReLU(inplace=True),
             torch.nn.Linear(64, 128),
             torch.nn.ReLU(inplace=True),
@@ -53,7 +53,7 @@ class Policy(object):
     a situation where it is going to die.
     """
 
-    def __init__(self, epsilon, alpha, discount=0.5, eps_end=0.05,
+    def __init__(self, epsilon, alpha, discount=0.8, eps_end=0.004,
                  action_space=[0, 1, 2], lr=1e-3, optim=torch.optim.RMSprop,
                  loss_fn=torch.nn.MSELoss):
         self.epsilon = epsilon
@@ -143,3 +143,11 @@ class Policy(object):
         self.memory_actions = np.array([])
         self.memory_rewards = np.array([])
         self.discounted = False
+
+    def save(self, model_path, optim_path):
+        torch.save(self.model.state_dict(), model_path)
+        torch.save(self.model.optimizer.state_dict(), optim_path)
+
+    def load(self, model_path, optim_path):
+        self.model.load_state_dict(torch.load(model_path))
+        self.model.optimizer.load_state_dict(torch.load(optim_path))

@@ -74,9 +74,9 @@ def start_snake(eat, death, step, display=False, display_title='Snake'):
     Parameters
     ----------
     eat : int
-        DESCRIPTION.
+        Reward for eating.
     death : int
-        DESCRIPTION.
+        Punishment for dying (negative).
     step : int
         Punishment for taking steps. The default is 0.
     display : bool, optional
@@ -157,9 +157,9 @@ def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat, death,
 
     """
     unique_id = uuid.uuid4().hex
-    filename = 'results//' + unique_id
-    filename = filename + '.csv'
-    with open(filename, 'w', newline='') as f:
+    foldername = 'results//' + unique_id + '//'
+    os.mkdir(foldername)
+    with open(foldername + 'game_history.csv', 'w', newline='') as f:
         dw = csv.DictWriter(f, fieldnames=['Game_id', 'Score', 'Steps',
                                            'Epsilon'])
         dw.writeheader()
@@ -182,29 +182,30 @@ def init_data_files(nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat, death,
         writer.writerow([nb_games, disc, nn_lr, pol_lr, eps0, eps1, bs, eat,
                          death, step, str(optim), str(loss_fn()), unique_id])
 
-    return filename
+    return foldername
 
 
-def store_data(filename, game_id, score, steps, epsilon):
+def store_data(foldername, game_id, score, steps, epsilon):
     """
-    Function to store the data from one game to the file with name ´filename´.
+    Function to store the data from one game to the folder ´foldername´ in a
+    file named game_history.csv.
     """
-    with open(filename, 'a', newline='') as f:
+    with open(foldername + 'game_history.csv', 'a', newline='') as f:
         writer = csv.writer(f, delimiter=',')
         writer.writerow([game_id, score, steps, epsilon])
 
 
-def plot(filename, mean_every=20, column='Score', save_fig=False):
+def plot(foldername, mean_every=20, column='Score', save_fig=False):
     """
     Function which plots the game results contained in a file. It uses the mean
     value over ´mean_every´ samples in order for the graph to be more readable.
 
     Parameters
     ----------
-    filename : Name of the file which contains results for each game.
-        DESCRIPTION.
+    foldername : string
+        Name of the folder which contains results.
     mean_every : int, optional
-        DESCRIPTION. The default is 20.
+        Plot the mean over this number of values. The default is 20.
     column : string, optional
         Column name which we will plot. The default is 'Score'.
     save_fig : bool, optional
@@ -218,7 +219,7 @@ def plot(filename, mean_every=20, column='Score', save_fig=False):
     """
     i = 0
     new_ser = pd.Series()
-    df = pd.read_csv(filename)
+    df = pd.read_csv(foldername + 'game_history.csv')
     df = df[column]
     title = 'Mean value of {} every {} games'.format(column.lower(),
                                                      mean_every)
@@ -231,7 +232,7 @@ def plot(filename, mean_every=20, column='Score', save_fig=False):
     fig = new_ser.plot(title=title, legend=False).get_figure()
 
     if save_fig:
-        fig.savefig(filename[:-4] + column.lower() + '.pdf')
+        fig.savefig(foldername + column + '.pdf')
 
 
 def run_user():
@@ -252,7 +253,7 @@ def run_user():
 
 
 def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
-        death, step, optim, loss_fn):
+        death, step, optim, loss_fn, plot_every, plot_bool, save_model):
     """
     Main function.
 
@@ -271,9 +272,9 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
         Ending epsilon for the policy (rate at which we will choose a random
         action i.e. exploration rate).
     batch_size : int
-        DESCRIPTION.
+        Batch size for learning.
     nb_games : int
-        DESCRIPTION.
+        Total number of games to play.
     eat : int or float
         Reward for eating the fruit.
     death : int or float
@@ -284,6 +285,12 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
         Torch optimizer for the Neural Net.
     loss_fn : torch.nn.*
         Torch Loss function for the Neural Net.
+    plot_every : int
+        Plot the mean over this number of values (improve readability).
+    plot_bool : bool
+        Whether we want to plot the game history or not.
+    save_model : bool
+        Whether we want to save the model or not.
 
     Returns
     -------
@@ -296,9 +303,9 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
     scores = np.array([])
     i = 1
     print("Starting run")
-    results_filename = init_data_files(nb_games, discount, alpha, agent.lr,
-                                       epsilon, eps_end, batch_size, eat,
-                                       death, step, optim, loss_fn)
+    results_foldername = init_data_files(nb_games, discount, alpha, agent.lr,
+                                         epsilon, eps_end, batch_size, eat,
+                                         death, step, optim, loss_fn)
 
     try:
         while i <= nb_games:
@@ -333,25 +340,62 @@ def run(display, epsilon, alpha, discount, eps_end, batch_size, nb_games, eat,
             print("Score : {}, steps: {}".format(s.score, agent.steps))
 
             scores = np.append(scores, s.score)
-            store_data(results_filename, game_id=i, score=s.score,
+            store_data(results_foldername, game_id=i, score=s.score,
                        steps=agent.steps, epsilon=agent.epsilon)
             i += 1
             agent.steps = 0
 
-        plt.figure(0)
-        plot(results_filename, mean_every=20, column='Score', save_fig=True)
-        plt.figure(1)
-        plot(results_filename, mean_every=20, column='Steps', save_fig=True)
+        if plot_bool:
+            plt.figure(0)
+            plot(results_foldername, mean_every=plot_every, column='Score',
+                 save_fig=True)
+            plt.figure(1)
+            plot(results_foldername, mean_every=plot_every, column='Steps',
+                 save_fig=True)
+
+        if save_model:
+            agent.save(results_foldername + 'model.tar',
+                       results_foldername + 'optim.tar')
 
     except KeyboardInterrupt:
         if window is not None:
             window.destroy()
         plt.figure(0)
-        plot(results_filename, mean_every=20, column='Score', save_fig=True)
+        plot(results_foldername, mean_every=plot_every, column='Score',
+             save_fig=True)
         plt.figure(1)
-        plot(results_filename, mean_every=20, column='Steps', save_fig=True)
+        plot(results_foldername, mean_every=plot_every, column='Steps',
+             save_fig=True)
+
+        if save_model:
+            agent.save(results_foldername + 'model.tar',
+                       results_foldername + 'optim.tar')
 
     print("Sum of scores after {} games : {}".format(i-1, scores.sum()))
+
+
+def continue_training(string_id, nb_games):
+    # Load hyperparameters
+    results = pd.read_csv('results//results_index.csv')
+    entry = results.loc[results['string_identification'] == string_id]
+    entry = entry.values[0]
+    nb_games += entry[0]
+    discount = entry[1]
+    alpha = entry[2]
+    policy_lr = entry[3]
+    epsilon = entry[4]
+    eps_end = entry[5]
+    batch_size = entry[6]
+    eat = entry[7]
+    death = entry[8]
+    step = entry[9]
+    optim = entry[10]
+    loss_fn = entry[11]
+
+    # Load the model checkpoint & run the games
+    pass
+
+    # Create the new plots
 
 
 # ----- CLASSES -----
@@ -366,6 +410,10 @@ class Snake(object):
         self.EAT_REWARD = eat
         self.DEATH_PUNISH = death
         self.STEP_PUNISH = step
+        self.last_three_turns = [(0.5, 0.5, 0.5), (0.5, 0.5, 0.5),
+                                 (0.5, 0.5, 0.5)]
+        self.current_turn = (0, 0, 0)
+        self.new_turn = False
 
         # x and y position of the head
         self.head = (W//2, H//2)
@@ -404,6 +452,7 @@ class Snake(object):
             - 4 boolean values for the direction the snake is going in
             - 4 boolean values if the fruit is below, above, left or right
             - 4 boolean values which will warn the snake of immediate danger
+            - 3*3 values for the last turns (x_pos, y_pos, left=0 or right=1)
 
         Returns
         -------
@@ -440,6 +489,10 @@ class Snake(object):
                 state.append(1)
             else:
                 state.append(0)
+
+        for turn in self.last_three_turns:
+            for info in turn:
+                state.append(info)
 
         return np.asarray(state)
 
@@ -499,6 +552,16 @@ class Snake(object):
         None.
 
         """
+
+        if self.new_turn:
+            self.last_three_turns[0], self.last_three_turns[1],\
+                self.last_three_turns[2] = self.current_turn,\
+                self.last_three_turns[0], self.last_three_turns[1]
+            self.new_turn = False
+
+        if next_turn == 0 or next_turn == 2:
+            self.current_turn = (self.head[0]/20, self.head[1]/20, next_turn/2)
+            self.new_turn = True
 
         if self.dead:
             return
@@ -635,6 +698,7 @@ class Body(object):
 
 if __name__ == "__main__":
     run(display=False, epsilon=1.004, alpha=1e-5, discount=0.8, eps_end=0.004,
-        batch_size=8, nb_games=4750, eat=1, death=-1, step=0,
-        optim=torch.optim.Adam, loss_fn=torch.nn.MSELoss)
+        batch_size=8, nb_games=1000000, eat=1, death=-1, step=0,
+        optim=torch.optim.Adam, loss_fn=torch.nn.MSELoss, plot_every=100,
+        plot_bool=True, save_model=True)
     # run_user()
